@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>自由五子棋 Gomoku</title>
+<style>
+  :root {
+    --bg: #17120d;
+    --panel: rgba(35, 25, 16, 0.86);
+    --board: #d6a85f;
+    --board-dark: #9b642c;
+    --line: #4f3217;
+    --accent: #e7b85e;
+    --text: #fff4df;
+    --muted: #c9aa7d;
+    --danger: #ff5f5f;
+    --ok: #7dffb0;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    font-family: "Microsoft JhengHei", "Noto Sans TC", system-ui, sans-serif;
+    color: var(--text);
+    background:
+      radial-gradient(circle at top, rgba(255, 204, 120, 0.14), transparent 36rem),
+      linear-gradient(135deg, #130f0b, #24170d 45%, #100b08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+  }
+
+  .app {
+    width: min(1120px, 100%);
+    display: grid;
+    grid-template-columns: minmax(320px, 690px) 310px;
+    gap: 22px;
+    align-items: start;
+  }
+
+  .board-wrap, .side {
+    background: var(--panel);
+    border: 1px solid rgba(255, 218, 150, 0.18);
+    border-radius: 22px;
+    box-shadow: 0 24px 80px rgba(0,0,0,.38), inset 0 1px 0 rgba(255,255,255,.06);
+    backdrop-filter: blur(10px);
+  }
+
+  .board-wrap {
+    padding: 24px;
+  }
+
+  .board-shell {
+    width: 100%;
+    aspect-ratio: 1;
+    position: relative;
+    border-radius: 18px;
+    background:
+      radial-gradient(circle at 25% 25%, rgba(255,255,255,.16), transparent 18%),
+      linear-gradient(135deg, rgba(120,68,23,.18), rgba(255,255,255,.06), rgba(95,48,13,.2)),
+      repeating-linear-gradient(35deg, rgba(111,65,25,.12) 0 8px, rgba(255,229,164,.08) 8px 15px),
+      var(--board);
+    border: 7px solid #7b491d;
+    box-shadow: inset 0 0 26px rgba(80, 43, 10, .42), 0 18px 40px rgba(0,0,0,.32);
+    overflow: hidden;
+  }
+
+  canvas {
+    width: 100%;
+    height: 100%;
+    display: block;
+    cursor: pointer;
+  }
+
+  .side {
+    padding: 22px;
+  }
+
+  h1 {
+    margin: 0 0 4px;
+    font-size: 26px;
+    letter-spacing: .04em;
+  }
+
+  .sub {
+    color: var(--muted);
+    font-size: 13px;
+    margin-bottom: 18px;
+    line-height: 1.6;
+  }
+
+  .status {
+    min-height: 72px;
+    padding: 16px;
+    border-radius: 16px;
+    background: rgba(0,0,0,.22);
+    border: 1px solid rgba(255,255,255,.08);
+    margin-bottom: 16px;
+  }
+
+  .status .main {
+    font-size: 18px;
+    font-weight: 700;
+    margin-bottom: 6px;
+  }
+
+  .status .detail {
+    font-size: 13px;
+    color: var(--muted);
+  }
+
+  label {
+    display: block;
+    font-size: 13px;
+    color: var(--muted);
+    margin: 14px 0 7px;
+  }
+
+  select, button {
+    width: 100%;
+    border: 0;
+    border-radius: 13px;
+    padding: 12px 13px;
+    font-size: 15px;
+    font-family: inherit;
+  }
+
+  select {
+    color: var(--text);
+    background: rgba(0,0,0,.3);
+    border: 1px solid rgba(255,255,255,.1);
+    outline: none;
+  }
+
+  button {
+    margin-top: 12px;
+    cursor: pointer;
+    color: #261607;
+    font-weight: 800;
+    background: linear-gradient(180deg, #ffd889, #d99936);
+    box-shadow: 0 8px 18px rgba(0,0,0,.26);
+    transition: transform .12s ease, filter .12s ease;
+  }
+
+  button:hover { transform: translateY(-1px); filter: brightness(1.06); }
+  button:active { transform: translateY(1px); }
+  button.secondary { background: linear-gradient(180deg, #f3e2c0, #b9935e); }
+  button:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+  .tips {
+    margin-top: 18px;
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.055);
+    color: var(--muted);
+    font-size: 13px;
+    line-height: 1.7;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 999px;
+    font-size: 12px;
+    color: #170f09;
+    background: var(--accent);
+    margin-right: 5px;
+    font-weight: 800;
+  }
+
+  @media (max-width: 900px) {
+    body { padding: 14px; align-items: start; }
+    .app { grid-template-columns: 1fr; }
+    .side { order: -1; }
+    .board-wrap { padding: 14px; }
+  }
+</style>
+</head>
+<body>
+  <main class="app">
+    <section class="board-wrap">
+      <div class="board-shell">
+        <canvas id="board"></canvas>
+      </div>
+    </section>
+
+    <aside class="side">
+      <h1>自由五子棋</h1>
+      <div class="sub">無禁手，五連以上即勝。預設玩家黑棋先手，可開啟讓子讓 AI 先手。</div>
+
+      <div class="status">
+        <div class="main" id="statusMain">準備中</div>
+        <div class="detail" id="statusDetail">15×15 棋盤</div>
+      </div>
+
+      <label for="difficulty">AI 難度</label>
+      <select id="difficulty">
+        <option value="easy">簡單：偏隨機</option>
+        <option value="normal" selected>普通：基本攻防</option>
+        <option value="hard">困難：強化評分</option>
+      </select>
+
+      <label for="handicap">先後手</label>
+      <select id="handicap">
+        <option value="playerFirst" selected>玩家黑棋先手</option>
+        <option value="aiFirst">讓子：AI 黑棋先手</option>
+      </select>
+
+      <button id="restart">重新開始</button>
+      <button class="secondary" id="undo">悔棋</button>
+      <button class="secondary" id="soundToggle">音效/BGM：開</button>
+
+      <div class="tips">
+        <span class="badge">規則</span>黑白雙方相同，不判三三、四四、長連禁手。<br />
+        <span class="badge">操作</span>滑鼠移到棋盤會預覽落子，紅圈是最後一步，勝利連線會發光。<br />
+        <span class="badge">音效</span>落子聲與勝利音效加大，BGM 輕快小聲循環，皆可離線播放。
+      </div>
+    </aside>
+  </main>
+
+<script>
+(() => {
+  const SIZE = 15;
+  const EMPTY = 0;
+  const BLACK = 1;
+  const WHITE = 2;
+  const HUMAN = 'human';
+  const AI = 'ai';
+
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const difficultyEl = document.getElementById('difficulty');
+  const handicapEl = document.getElementById('handicap');
+  const restartBtn = document.getElementById('restart');
+  const undoBtn = document.getElementById('undo');
+  const soundToggleBtn = document.getElementById('soundToggle');
+  const statusMain = document.getElementById('statusMain');
+  const statusDetail = document.getElementById('statusDetail');
+
+  let board = [];
+  let current = BLACK;
+  let humanColor = BLACK;
+  let aiColor = WHITE;
+  let gameOver = false;
+  let thinking = false;
+  let lastMove = null;
+  let winLine = [];
+  let history = [];
+  let hover = null;
+  let soundEnabled = true;
+  let audioCtx = null;
+  let bgmTimer = null;
+  let bgmGain = null;
+  let bgmStep = 0;
+  let cell = 0;
+  let margin = 0;
+
+  const dirs = [[1,0], [0,1], [1,1], [1,-1]];
+
+
+  function ensureAudio() {
+    if (!soundEnabled) return null;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return null;
+    if (!audioCtx) audioCtx = new AudioContextClass();
+    if (audioCtx.state === 'suspended') audioCtx.resume().catch(() => {});
+    return audioCtx;
+  }
+
+  function getOutputGain(multiplier = 1) {
+    const ac = ensureAudio();
+    if (!ac) return null;
+    const gainNode = ac.createGain();
+    gainNode.gain.value = multiplier;
+    gainNode.connect(ac.destination);
+    return { ac, gainNode };
+  }
+
+  function playTone({ frequency = 440, duration = 0.08, type = 'sine', gain = 0.08, start = 0, slideTo = null, outputGain = null }) {
+    const ac = ensureAudio();
+    if (!ac) return;
+    const now = ac.currentTime + start;
+    const osc = ac.createOscillator();
+    const vol = ac.createGain();
+
+    osc.type = type;
+    osc.frequency.setValueAtTime(frequency, now);
+    if (slideTo) osc.frequency.exponentialRampToValueAtTime(slideTo, now + duration);
+
+    vol.gain.setValueAtTime(0.0001, now);
+    vol.gain.exponentialRampToValueAtTime(gain, now + 0.008);
+    vol.gain.exponentialRampToValueAtTime(0.0001, now + duration);
+
+    osc.connect(vol);
+    vol.connect(outputGain || ac.destination);
+    osc.start(now);
+    osc.stop(now + duration + 0.03);
+  }
+
+  function playPlaceSound(color) {
+    if (!soundEnabled) return;
+    const base = color === BLACK ? 230 : 285;
+    // 較大、短促的木質落子感
+    playTone({ frequency: base, duration: 0.07, type: 'triangle', gain: 0.22, slideTo: base * 0.62 });
+    playTone({ frequency: base * 1.85, duration: 0.045, type: 'sine', gain: 0.07, start: 0.01 });
+    playTone({ frequency: 90, duration: 0.035, type: 'square', gain: 0.035, start: 0.002, slideTo: 55 });
+  }
+
+  function playWinSound() {
+    if (!soundEnabled) return;
+    const notes = [523.25, 659.25, 783.99, 1046.5, 1318.51];
+    notes.forEach((frequency, i) => {
+      playTone({ frequency, duration: 0.22, type: 'sine', gain: 0.18, start: i * 0.105 });
+      playTone({ frequency: frequency / 2, duration: 0.28, type: 'triangle', gain: 0.08, start: i * 0.105 });
+    });
+    playTone({ frequency: 1567.98, duration: 0.42, type: 'sine', gain: 0.12, start: 0.52 });
+  }
+
+  function startBgm() {
+    const ac = ensureAudio();
+    if (!ac || bgmTimer) return;
+    bgmGain = ac.createGain();
+    bgmGain.gain.value = 0.028; // BGM 故意小聲，避免蓋過落子聲與勝利聲
+    bgmGain.connect(ac.destination);
+
+    const melody = [392.00, 493.88, 587.33, 659.25, 587.33, 493.88, 440.00, 523.25];
+    const bass = [196.00, 246.94, 293.66, 246.94];
+
+    const tick = () => {
+      if (!soundEnabled || !bgmGain) return;
+      const m = melody[bgmStep % melody.length];
+      const b = bass[Math.floor(bgmStep / 2) % bass.length];
+      playTone({ frequency: m, duration: 0.18, type: 'triangle', gain: 0.035, outputGain: bgmGain });
+      if (bgmStep % 2 === 0) {
+        playTone({ frequency: b, duration: 0.22, type: 'sine', gain: 0.022, outputGain: bgmGain });
+      }
+      bgmStep++;
+    };
+
+    tick();
+    bgmTimer = setInterval(tick, 260);
+  }
+
+  function stopBgm() {
+    if (bgmTimer) {
+      clearInterval(bgmTimer);
+      bgmTimer = null;
+    }
+    if (bgmGain) {
+      bgmGain.disconnect();
+      bgmGain = null;
+    }
+  }
+
+  function initBoard() {
+    board = Array.from({ length: SIZE }, () => Array(SIZE).fill(EMPTY));
+    history = [];
+    lastMove = null;
+    winLine = [];
+    gameOver = false;
+    thinking = false;
+
+    if (handicapEl.value === 'aiFirst') {
+      aiColor = BLACK;
+      humanColor = WHITE;
+      current = BLACK;
+    } else {
+      humanColor = BLACK;
+      aiColor = WHITE;
+      current = BLACK;
+    }
+
+    resizeCanvas();
+    updateStatus();
+
+    if (current === aiColor) {
+      setTimeout(aiMove, 500);
+    }
+  }
+
+  function resizeCanvas() {
+    const rect = canvas.getBoundingClientRect();
+    const dpr = window.devicePixelRatio || 1;
+    canvas.width = Math.floor(rect.width * dpr);
+    canvas.height = Math.floor(rect.height * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const w = rect.width;
+    margin = w * 0.065;
+    cell = (w - margin * 2) / (SIZE - 1);
+    draw();
+  }
+
+  function updateStatus(msg) {
+    if (msg) {
+      statusMain.textContent = msg;
+    } else if (gameOver) {
+      statusMain.textContent = '遊戲結束';
+    } else if (thinking) {
+      statusMain.textContent = `AI（${stoneName(aiColor)}）思考中...`;
+    } else if (current === humanColor) {
+      statusMain.textContent = `玩家（${stoneName(humanColor)}）回合`;
+    } else {
+      statusMain.textContent = `AI（${stoneName(aiColor)}）回合`;
+    }
+
+    statusDetail.textContent = `玩家：${stoneName(humanColor)}　AI：${stoneName(aiColor)}　難度：${difficultyText()}`;
+    undoBtn.disabled = thinking || history.length === 0 || gameOver && history.length === 0;
+  }
+
+  function stoneName(color) { return color === BLACK ? '黑棋' : '白棋'; }
+  function difficultyText() {
+    return { easy: '簡單', normal: '普通', hard: '困難' }[difficultyEl.value];
+  }
+  function other(color) { return color === BLACK ? WHITE : BLACK; }
+  function inBounds(x, y) { return x >= 0 && x < SIZE && y >= 0 && y < SIZE; }
+
+  function place(x, y, color, actor) {
+    if (!inBounds(x, y) || board[y][x] !== EMPTY || gameOver) return false;
+    board[y][x] = color;
+    lastMove = { x, y };
+    history.push({ x, y, color, actor });
+    playPlaceSound(color);
+
+    const line = getWinLine(x, y, color);
+    if (line.length >= 5) {
+      gameOver = true;
+      winLine = line;
+      const side = color === BLACK ? '黑方' : '白方';
+      const winner = color === humanColor ? '玩家獲勝！' : 'AI 獲勝！';
+      playWinSound();
+      updateStatus(winner);
+      setTimeout(() => alert(`恭喜${side}勝利！`), 120);
+    } else if (isFull()) {
+      gameOver = true;
+      updateStatus('平手！棋盤已滿');
+    } else {
+      current = other(color);
+      updateStatus();
+    }
+    draw();
+    return true;
+  }
+
+  function getWinLine(x, y, color) {
+    for (const [dx, dy] of dirs) {
+      const line = [{ x, y }];
+      for (const sign of [-1, 1]) {
+        let nx = x + dx * sign;
+        let ny = y + dy * sign;
+        while (inBounds(nx, ny) && board[ny][nx] === color) {
+          line.push({ x: nx, y: ny });
+          nx += dx * sign;
+          ny += dy * sign;
+        }
+      }
+      if (line.length >= 5) return line;
+    }
+    return [];
+  }
+
+  function isFull() {
+    return board.every(row => row.every(v => v !== EMPTY));
+  }
+
+  function draw() {
+    const rect = canvas.getBoundingClientRect();
+    const w = rect.width;
+    ctx.clearRect(0, 0, w, w);
+
+    drawGrid(w);
+    drawStars();
+    drawHover();
+
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        if (board[y][x] !== EMPTY) drawStone(x, y, board[y][x]);
+      }
+    }
+    drawLastMove();
+    drawWinLine();
+  }
+
+  function pos(x, y) {
+    return { px: margin + x * cell, py: margin + y * cell };
+  }
+
+  function drawGrid(w) {
+    ctx.save();
+    ctx.strokeStyle = 'rgba(57, 32, 11, .86)';
+    ctx.lineWidth = 1.25;
+    ctx.beginPath();
+    for (let i = 0; i < SIZE; i++) {
+      const p = margin + i * cell;
+      ctx.moveTo(margin, p);
+      ctx.lineTo(w - margin, p);
+      ctx.moveTo(p, margin);
+      ctx.lineTo(p, w - margin);
+    }
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawStars() {
+    const stars = [[3,3], [7,3], [11,3], [3,7], [7,7], [11,7], [3,11], [7,11], [11,11]];
+    ctx.save();
+    ctx.fillStyle = 'rgba(49, 28, 9, .9)';
+    for (const [x, y] of stars) {
+      const { px, py } = pos(x, y);
+      ctx.beginPath();
+      ctx.arc(px, py, cell * 0.105, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  function drawStone(x, y, color, alpha = 1) {
+    const { px, py } = pos(x, y);
+    const r = cell * 0.42;
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    ctx.shadowColor = 'rgba(0,0,0,.45)';
+    ctx.shadowBlur = r * .35;
+    ctx.shadowOffsetY = r * .18;
+
+    const grad = ctx.createRadialGradient(px - r * .35, py - r * .45, r * .12, px, py, r);
+    if (color === BLACK) {
+      grad.addColorStop(0, '#67615a');
+      grad.addColorStop(.35, '#151515');
+      grad.addColorStop(1, '#000');
+    } else {
+      grad.addColorStop(0, '#ffffff');
+      grad.addColorStop(.55, '#f1eee6');
+      grad.addColorStop(1, '#bdb6aa');
+    }
+
+    ctx.fillStyle = grad;
+    ctx.beginPath();
+    ctx.arc(px, py, r, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawHover() {
+    if (!hover || thinking || gameOver || current !== humanColor) return;
+    if (board[hover.y][hover.x] !== EMPTY) return;
+    drawStone(hover.x, hover.y, humanColor, .42);
+  }
+
+  function drawLastMove() {
+    if (!lastMove) return;
+    const { px, py } = pos(lastMove.x, lastMove.y);
+    ctx.save();
+    ctx.strokeStyle = '#ff3e3e';
+    ctx.lineWidth = Math.max(2, cell * .07);
+    ctx.beginPath();
+    ctx.arc(px, py, cell * .25, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  function drawWinLine() {
+    if (!winLine.length) return;
+    ctx.save();
+    for (const m of winLine) {
+      const { px, py } = pos(m.x, m.y);
+      ctx.shadowColor = 'rgba(255, 224, 92, .95)';
+      ctx.shadowBlur = cell * .28;
+      ctx.strokeStyle = '#ffe45c';
+      ctx.lineWidth = Math.max(3, cell * .09);
+      ctx.beginPath();
+      ctx.arc(px, py, cell * .49, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  function mouseToCell(e) {
+    const rect = canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    const x = Math.round((mx - margin) / cell);
+    const y = Math.round((my - margin) / cell);
+    const { px, py } = pos(x, y);
+    const dist = Math.hypot(mx - px, my - py);
+    if (inBounds(x, y) && dist < cell * .48) return { x, y };
+    return null;
+  }
+
+  canvas.addEventListener('mousemove', e => {
+    hover = mouseToCell(e);
+    draw();
+  });
+
+  canvas.addEventListener('mouseleave', () => {
+    hover = null;
+    draw();
+  });
+
+  canvas.addEventListener('click', e => {
+    if (thinking || gameOver || current !== humanColor) return;
+    ensureAudio();
+    const p = mouseToCell(e);
+    if (!p) return;
+    if (place(p.x, p.y, humanColor, HUMAN) && !gameOver) {
+      thinking = true;
+      updateStatus();
+      const delay = 300 + Math.random() * 500;
+      setTimeout(aiMove, delay);
+    }
+  });
+
+  function aiMove() {
+    if (gameOver) return;
+    thinking = false;
+    const move = chooseAiMove();
+    if (move) place(move.x, move.y, aiColor, AI);
+  }
+
+  function chooseAiMove() {
+    const candidates = getCandidates();
+    if (!candidates.length) return { x: 7, y: 7 };
+
+    const diff = difficultyEl.value;
+    if (diff === 'easy') {
+      if (Math.random() < 0.7) return randomPick(candidates);
+      return bestMove(candidates, 0.8);
+    }
+    if (diff === 'normal') {
+      if (Math.random() < 0.18) return randomPick(candidates);
+      return bestMove(candidates, 1.0);
+    }
+    return bestMove(candidates, 1.35);
+  }
+
+  function randomPick(arr) {
+    return arr[Math.floor(Math.random() * arr.length)];
+  }
+
+  function getCandidates() {
+    const hasStone = board.some(row => row.some(v => v !== EMPTY));
+    if (!hasStone) return [{ x: 7, y: 7 }];
+
+    const set = new Set();
+    const range = difficultyEl.value === 'hard' ? 2 : 1;
+    for (let y = 0; y < SIZE; y++) {
+      for (let x = 0; x < SIZE; x++) {
+        if (board[y][x] === EMPTY) continue;
+        for (let dy = -range; dy <= range; dy++) {
+          for (let dx = -range; dx <= range; dx++) {
+            const nx = x + dx, ny = y + dy;
+            if (inBounds(nx, ny) && board[ny][nx] === EMPTY) set.add(`${nx},${ny}`);
+          }
+        }
+      }
+    }
+    return [...set].map(s => {
+      const [x, y] = s.split(',').map(Number);
+      return { x, y };
+    });
+  }
+
+  function bestMove(candidates, attackBias) {
+    let best = null;
+    let bestScore = -Infinity;
+    for (const m of candidates) {
+      const attack = evaluatePoint(m.x, m.y, aiColor);
+      const defense = evaluatePoint(m.x, m.y, humanColor);
+      const center = 18 - Math.abs(m.x - 7) - Math.abs(m.y - 7);
+      const noise = Math.random() * 4;
+      const score = attack * attackBias + defense * 1.12 + center + noise;
+      if (score > bestScore) {
+        bestScore = score;
+        best = m;
+      }
+    }
+    return best;
+  }
+
+  function evaluatePoint(x, y, color) {
+    if (board[y][x] !== EMPTY) return -Infinity;
+    board[y][x] = color;
+
+    let total = 0;
+    let openThree = 0;
+    let openFour = 0;
+    let rushFour = 0;
+
+    for (const [dx, dy] of dirs) {
+      const info = lineInfo(x, y, color, dx, dy);
+      const n = info.count;
+      const open = info.openEnds;
+
+      if (n >= 5) total += 10000000;
+      else if (n === 4 && open === 2) { total += 700000; openFour++; }
+      else if (n === 4 && open === 1) { total += 120000; rushFour++; }
+      else if (n === 3 && open === 2) { total += 36000; openThree++; }
+      else if (n === 3 && open === 1) total += 5000;
+      else if (n === 2 && open === 2) total += 1500;
+      else if (n === 2 && open === 1) total += 220;
+      else if (n === 1 && open === 2) total += 30;
+
+      total += patternWindowScore(x, y, color, dx, dy);
+    }
+
+    if (openFour >= 2) total += 900000;
+    if (openFour >= 1 && rushFour >= 1) total += 550000;
+    if (openThree >= 2) total += 85000;
+
+    board[y][x] = EMPTY;
+    return total;
+  }
+
+  function lineInfo(x, y, color, dx, dy) {
+    let count = 1;
+    let openEnds = 0;
+
+    for (const sign of [-1, 1]) {
+      let nx = x + dx * sign;
+      let ny = y + dy * sign;
+      while (inBounds(nx, ny) && board[ny][nx] === color) {
+        count++;
+        nx += dx * sign;
+        ny += dy * sign;
+      }
+      if (inBounds(nx, ny) && board[ny][nx] === EMPTY) openEnds++;
+    }
+    return { count, openEnds };
+  }
+
+  function patternWindowScore(x, y, color, dx, dy) {
+    let score = 0;
+    const enemy = other(color);
+    let s = '';
+    for (let i = -4; i <= 4; i++) {
+      const nx = x + dx * i;
+      const ny = y + dy * i;
+      if (!inBounds(nx, ny)) s += 'B';
+      else if (board[ny][nx] === EMPTY) s += '_';
+      else if (board[ny][nx] === color) s += 'O';
+      else if (board[ny][nx] === enemy) s += 'X';
+    }
+
+    const patterns = [
+      [/OOOOO/, 10000000],
+      [/_OOOO_/, 850000],
+      [/_OOOO|OOOO_/, 150000],
+      [/OOO_O|OO_OO|O_OOO/, 180000],
+      [/_OOO_/, 50000],
+      [/_OO_O_|_O_OO_/, 32000],
+      [/_OO__|__OO_/, 1500],
+      [/_O_O_/, 1200]
+    ];
+    for (const [re, val] of patterns) if (re.test(s)) score += val;
+    return score;
+  }
+
+  function undo() {
+    if (thinking || history.length === 0) return;
+    gameOver = false;
+    winLine = [];
+
+    if (history.length && history[history.length - 1].actor === AI) removeLast();
+    if (history.length && history[history.length - 1].actor === HUMAN) removeLast();
+    if (history.length && history[history.length - 1].actor === AI && current !== humanColor) removeLast();
+
+    lastMove = history.length ? { x: history[history.length - 1].x, y: history[history.length - 1].y } : null;
+    current = humanColor;
+    updateStatus();
+    draw();
+  }
+
+  function removeLast() {
+    const m = history.pop();
+    if (m) board[m.y][m.x] = EMPTY;
+  }
+
+  soundToggleBtn.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundToggleBtn.textContent = soundEnabled ? '音效/BGM：開' : '音效/BGM：關';
+    if (soundEnabled) {
+      ensureAudio();
+      startBgm();
+      playTone({ frequency: 660, duration: 0.08, type: 'sine', gain: 0.14 });
+    } else {
+      stopBgm();
+    }
+  });
+
+  restartBtn.addEventListener('click', () => { ensureAudio(); startBgm(); initBoard(); });
+  undoBtn.addEventListener('click', undo);
+  difficultyEl.addEventListener('change', () => { ensureAudio(); startBgm(); initBoard(); });
+  handicapEl.addEventListener('change', () => { ensureAudio(); startBgm(); initBoard(); });
+  window.addEventListener('resize', resizeCanvas);
+
+  initBoard();
+})();
+</script>
+</body>
+</html>
